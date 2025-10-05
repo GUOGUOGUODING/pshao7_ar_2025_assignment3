@@ -1,172 +1,106 @@
 <!doctype html>
 <html>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <head>
+    <meta charset="utf-8" />
+    <title>Babylon.js AR (module build)</title>
+    <style>
+      html, body { width:100%; height:100%; margin:0; overflow:hidden; }
+      #renderCanvas { width:100%; height:100%; touch-action:none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="renderCanvas"></canvas>
 
-        <title>Babylon.js sample code</title>
-
-        <!-- Babylon.js -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
-        <script src="https://assets.babylonjs.com/generated/Assets.js"></script>
-        <script src="https://cdn.babylonjs.com/recast.js"></script>
-        <script src="https://cdn.babylonjs.com/ammo.js"></script>
-        <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
-        <script src="https://cdn.babylonjs.com/cannon.js"></script>
-        <script src="https://cdn.babylonjs.com/Oimo.js"></script>
-        <script src="https://cdn.babylonjs.com/earcut.min.js"></script>
-        <script src="https://cdn.babylonjs.com/babylon.js"></script>
-        <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
-        <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
-        <script src="https://cdn.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
-        <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.js"></script>
-        <script src="https://cdn.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
-        <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
-        <script src="https://cdn.babylonjs.com/addons/babylonjs.addons.min.js"></script>
-        <script src="https://cdn.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
-
-        <style>
-            html,
-            body {
-                overflow: hidden;
-                width: 100%;
-                height: 100%;
-                margin: 0;
-                padding: 0;
-            }
-
-            #renderCanvas {
-                width: 100%;
-                height: 100%;
-                touch-action: none;
-            }
-
-            #canvasZone {
-                width: 100%;
-                height: 100%;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="canvasZone"><canvas id="renderCanvas"></canvas></div>
-        <script>
-                    var canvas = document.getElementById("renderCanvas");
-
-                    var startRenderLoop = function (engine, canvas) {
-                        engine.runRenderLoop(function () {
-                            if (sceneToRender && sceneToRender.activeCamera) {
-                                sceneToRender.render();
-                            }
-                        });
-                    }
-
-                    var engine = null;
-        var scene = null;
-        var sceneToRender = null;
-        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
-        var createScene = async function () {
-
-  const scene = new BABYLON.Scene(engine);
-
-  new BABYLON.HemisphericLight("lite", new BABYLON.Vector3(0, 1, 0), scene).intensity = 0.6;
-
-  const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("/model/", "pikachu2.glb", scene);
-  const template = container.createRootMesh();   
-  container.addAllToScene();
-  template.setEnabled(false);
-  template.scaling = new BABYLON.Vector3(0.4, 0.4, 0.4);
-
-  const xr = await BABYLON.WebXRDefaultExperience.CreateAsync(scene, {
-    uiOptions: { sessionMode: "immersive-ar", referenceSpaceType: "local" },
-    optionalFeatures: true
-  });
-  const fm = xr.baseExperience.featuresManager;
-  const hitTest = fm.enableFeature(BABYLON.WebXRFeatureName.HIT_TEST, "latest", {
-    offsetRay: new BABYLON.Ray(new BABYLON.Vector3(0, 0, 0), new BABYLON.Vector3(0, 0, -1)),
-    entityTypes: ["plane"]
-  });
-
-  let lastHit = null;           
-  hitTest.onHitTestResultObservable.add(results => {
-    lastHit = results.length ? results[0] : null;
-  });
-
-  let selected = null;             
-  xr.input.onControllerAddedObservable.add(xrController => {
-    if (xrController.inputSource.handedness !== "right") return;
-
-    xrController.onMotionControllerInitObservable.add(mc => {
-      const trigger = mc.getComponent("xr-standard-trigger");
-      trigger.onButtonStateChangedObservable.add(() => {
-        if (trigger.pressed && lastHit) {
-          const clone = template.clone("spawn_" + Date.now());
-          clone.setEnabled(true);
-          clone.position.copyFrom(lastHit.position);
-          const fwd = xr.baseExperience.camera.getForwardRay().direction;
-          clone.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionLH(
-            new BABYLON.Vector3(fwd.x, 0, fwd.z).normalize(),
-            BABYLON.Axis.Y
-          );
-          selected = clone; 
-        }
+    <script type="module">
+      const CORE = "https://cdn.jsdelivr.net/npm/@babylonjs/core@latest";
+      const LOADERS = "https://cdn.jsdelivr.net/npm/@babylonjs/loaders@latest";
+      import * as BABYLON from `${CORE}/+esm`;
+      import { LoadAssetContainerAsync } from `${CORE}/Loading/sceneLoader.js`;
+      import `${LOADERS}/glTF/2.0/glTFLoader.js`;
+      const canvas = document.getElementById("renderCanvas");
+      const engine = new BABYLON.Engine(canvas, true, {
+        preserveDrawingBuffer: true,
+        stencil: true
       });
-    });
-  });
 
-  const speed = 0.6; 
-  scene.onBeforeRenderObservable.add(() => {
-    if (!selected) return;
+      async function createScene() {
+        const scene = new BABYLON.Scene(engine);
 
-    const right = xr.input.controllers.find(c => c.inputSource.handedness === "right");
-    if (!right || !right.motionController) return;
+        new BABYLON.HemisphericLight("lite", new BABYLON.Vector3(0, 1, 0), scene).intensity = 0.6;
+        const container = await LoadAssetContainerAsync("/model/", "pikachu2.glb", scene);
+        const template = container.createRootMesh();   // TransformNode / root
+        container.addAllToScene();
+        template.setEnabled(false);
+        template.scaling = new BABYLON.Vector3(0.4, 0.4, 0.4);
+        const xr = await BABYLON.WebXRDefaultExperience.CreateAsync(scene, {
+          uiOptions: { sessionMode: "immersive-ar", referenceSpaceType: "local" },
+          optionalFeatures: true
+        });
 
-    const stick = right.motionController.getComponent("xr-standard-thumbstick");
-    if (!stick) return;
+        const fm = xr.baseExperience.featuresManager;
+        const hitTest = fm.enableFeature(BABYLON.WebXRFeatureName.HIT_TEST, "latest", {
+          offsetRay: new BABYLON.Ray(new BABYLON.Vector3(0, 0, 0), new BABYLON.Vector3(0, 0, -1)),
+          entityTypes: ["plane"]
+        });
 
-    const dt = scene.getEngine().getDeltaTime() / 1000;
+        let lastHit = null;
+        hitTest.onHitTestResultObservable.add(results => {
+          lastHit = results.length ? results[0] : null;
+        });
 
-    const cam = xr.baseExperience.camera;
-    const camForward = cam.getForwardRay().direction;
-    const forward2D = new BABYLON.Vector3(camForward.x, 0, camForward.z).normalize();
-    const right2D = BABYLON.Vector3.Cross(forward2D, BABYLON.Axis.Y).negate().normalize();
+        let selected = null;
+        xr.input.onControllerAddedObservable.add(xrController => {
+          if (xrController.inputSource.handedness !== "right") return;
 
-    const moveVec = right2D.scale(stick.axes.x * speed * dt)
-      .add(forward2D.scale(stick.axes.y * speed * dt));
-    selected.position.addInPlace(moveVec); 
-  });
+          xrController.onMotionControllerInitObservable.add(mc => {
+            const trigger = mc.getComponent("xr-standard-trigger");
+            trigger.onButtonStateChangedObservable.add(() => {
+              if (trigger.pressed && lastHit) {
+                const clone = template.clone("spawn_" + Date.now());
+                clone.setEnabled(true);
+                clone.position.copyFrom(lastHit.position);
 
-  return scene;
-};
+                const fwd = xr.baseExperience.camera.getForwardRay().direction;
+                clone.rotationQuaternion = BABYLON.Quaternion.FromLookDirectionLH(
+                  new BABYLON.Vector3(fwd.x, 0, fwd.z).normalize(),
+                  BABYLON.Axis.Y
+                );
+                selected = clone;
+              }
+            });
+          });
+        });
 
-                window.initFunction = async function() {
-                    
-                    
-                    
-                    var asyncEngineCreation = async function() {
-                        try {
-                        return createDefaultEngine();
-                        } catch(e) {
-                        console.log("the available createEngine function failed. Creating the default engine instead");
-                        return createDefaultEngine();
-                        }
-                    }
+        const speed = 0.6;
+        scene.onBeforeRenderObservable.add(() => {
+          if (!selected) return;
+          const right = xr.input.controllers.find(c => c.inputSource.handedness === "right");
+          if (!right || !right.motionController) return;
 
-                    window.engine = await asyncEngineCreation();
-                    
-                    const engineOptions = window.engine.getCreationOptions?.();
-                    if (!engineOptions || engineOptions.audioEngine !== false) {
-                        
-                    }
-        if (!engine) throw 'engine should not be null.';
-        startRenderLoop(engine, canvas);
-        window.scene = createScene();};
-        initFunction().then(() => {scene.then(returnedScene => { sceneToRender = returnedScene; });
-        
-                    });
+          const stick = right.motionController.getComponent("xr-standard-thumbstick");
+          if (!stick) return;
 
-                    // Resize
-                    window.addEventListener("resize", function () {
-                        engine.resize();
-                    });
-        </script>
-    </body>
+          const dt = scene.getEngine().getDeltaTime() / 1000;
+          const cam = xr.baseExperience.camera;
+          const camForward = cam.getForwardRay().direction;
+          const forward2D = new BABYLON.Vector3(camForward.x, 0, camForward.z).normalize();
+          const right2D = BABYLON.Vector3.Cross(forward2D, BABYLON.Axis.Y).negate().normalize();
+
+          const moveVec = right2D.scale(stick.axes.x * speed * dt)
+            .add(forward2D.scale(stick.axes.y * speed * dt));
+          selected.position.addInPlace(moveVec);
+        });
+
+        return scene;
+      }
+
+      const scene = await createScene();
+
+      engine.runRenderLoop(() => {
+        if (scene.activeCamera) scene.render();
+      });
+
+      window.addEventListener("resize", () => engine.resize());
+    </script>
+  </body>
 </html>
