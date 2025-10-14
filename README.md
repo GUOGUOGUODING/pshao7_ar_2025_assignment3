@@ -24,7 +24,7 @@
 - `5c.js` – Adds second point light  
 
 **How to run:**
-1. Open `Q5_PhongModel/index.html` in a browser.  
+1. Open `Q5/index.html` in a browser.  
 2. Replace the shader script section with the code from 5a.js / 5b.js / 5c.js to view each part’s result.  
 
 
